@@ -1,15 +1,8 @@
 import json
 from flask import Flask, request
+from config import *
 
 app = Flask("Shesterochka")
-
-adress = "localhost"
-
-port = 5000
-
-start_reference = f"http://{adress}:{port}"
-
-go_back = f'<p> <a   href= "{start_reference}" > Go back </a> </p> '
 
 
 def read_json(json_name):
@@ -25,25 +18,10 @@ def write_json(json_name, new_items):
 def parse_food(food, process):
     splitted = food.split(', ')
     order = {splitted[0]: {}}
-    order[splitted[0]].update({"process": process})
+    order[splitted[0]].update({name_process: process})
     for i in range(len(splitted) // 2):
         order[splitted[0]].update({splitted[2 * i + 1]: int(splitted[2 * i + 2])})
     return order
-
-
-def unique_form(is_double, first_text, button, first_tag, second_text, second_tag):
-    form = list()
-    form.append(f"""<form method="post">
-    <p>
-    <label for="first_label">{first_text}</label> <br>
-    <input type="first" name={first_tag}>
-    </p>""")
-    if is_double:
-        form.append(f""" <label for="second_label">{second_text}</label> <br>
-    <input type="second" name={second_tag}> <br>""")
-    form.append(f"""<input type="submit" value={button}>
-    </form>""")
-    return " ".join(tuple(form))
 
 
 def parse_new_food(food):
@@ -62,32 +40,20 @@ def login(test):
 
 @app.route('/')
 def start_page():
-    text1 = f"""<p> <strong> Shop! </strong> </p>
-    <p> <strong> Commands: </strong> </p>
-    <ol>
-    <li> <a  href="{start_reference}/offers" > /offers </a> - show food and offers   </li>
-    <li> <a  href="{start_reference}/check/" > /check </a> - check your order </li>
-    <li> <a  href="{start_reference}/add/" > /add </a> - add food to shop (admin only) </li>
-    <li> <a  href="{start_reference}/show_orders/" >/show_orders </a> - show all orders (admin only) </li>
-    <li> <a  href="{start_reference}/change_status/" >/change_status </a> 
-                                                        - change status order's id (admin only) </pli>
-    <li> <a  href="{start_reference}/change_password/" >/change_password </a> - change password (admin only) </li>
-    </ol>
-    """
-    return text1
+    return startpage
 
 
-@app.route('/offers/', methods=['POST', 'GET'])
+@app.route(offers_page, methods=['POST', 'GET'])
 def get_offer():
     text = list()
     data = read_json("data_file.json")
     for i in data:
         text.extend(["<p>", str(i), str(data[i]), "$", "</p>"])
     text.append(
-        unique_form(False, "Your order in format (Name, food, amount, food2, amount...) :", "order", "tag", " ", ""))
+        unique_form(False, offer_form, order, current_tag, " ", ""))
     if request.method == 'POST':
-        tag = request.form['tag']
-        current_order = parse_food(tag, "In process")
+        tag = request.form[current_tag]
+        current_order = parse_food(tag, in_process)
         orders = read_json("offers.json")
         orders.update(current_order)
         write_json("offers.json", orders)
@@ -95,101 +61,101 @@ def get_offer():
     return " ".join(tuple(text))
 
 
-@app.route('/check/', methods=['POST', 'GET'])
+@app.route(check_page, methods=['POST', 'GET'])
 def checking():
     text = list()
-    text.append(unique_form(False, "Your name :", "check", "tag", " ", " "))
+    text.append(unique_form(False, check_form, check, current_tag, " ", " "))
     if request.method == 'POST':
-        tag = request.form['tag']
+        tag = request.form[current_tag]
         orders = read_json("offers.json")
         if tag in orders:
-            status = orders[tag]["process"]
+            status = orders[tag][name_process]
         else:
-            status = "No orders!"
+            status = no_order
         text.append(status)
     text.append(go_back)
     return " ".join(tuple(text))
 
 
-@app.route('/add/', methods=['POST', 'GET'])
+@app.route(add_page, methods=['POST', 'GET'])
 def add():
     text = list()
-    text.append(unique_form(True, "Password", "add", "password", "New food in format(Food1, cost1, ..) ", "new_food"))
+    text.append(unique_form(True, Password, add, Password, add_form, food_update))
     if request.method == 'POST':
-        password = request.form.get("password")
+        password = request.form.get(Password)
         if not login(password):
-            text.append('<p> Access denied! </p>')
+            text.append(no_access)
         else:
             food = request.form.get('new_food')
             new_food = parse_new_food(food)
             orders = read_json("data_file.json")
             orders.update(new_food)
             write_json("data_file.json", orders)
-            text.append('<p> Added! </p>')
+            text.append(changed)
     text.append(go_back)
     return " ".join(tuple(text))
 
 
-@app.route('/show_orders/', methods=['POST', 'GET'])
+@app.route(show_page, methods=['POST', 'GET'])
 def show_orders():
     text = list()
-    text.append(unique_form(False, "Password", "check", "tag", " ", " "))
+    text.append(unique_form(False, Password, check, current_tag, " ", " "))
     if request.method == 'POST':
-        password = request.form["tag"]
+        password = request.form[current_tag]
         if not login(password):
-            text.append('<p> Access denied! </p>')
+            text.append(no_access)
         else:
             data = read_json("offers.json")
             for i in data:
                 text.extend(["<p>", str(i), ":"])
                 for j in data[i]:
-                    if j == "process":
+                    if j == name_process:
                         text.extend([str(j), "-", str(data[i][j])])
                     else:
-                        text.extend([",", str(j), str(data[i][j]), "pieces"])
+                        text.extend([",", str(j), str(data[i][j]), pieces])
                 text.append("</p>")
     text.append(go_back)
     return " ".join(tuple(text))
 
 
-@app.route('/change_status/', methods=['POST', 'GET'])
+@app.route(change_order_page, methods=['POST', 'GET'])
 def change_status():
     text = list()
     text.append(
-        unique_form(True, "Password", "change", "password", "Changes in format(Name1, change1, ..) ", "changes"))
+        unique_form(True, Password, change, Password, changes_form, change))
     if request.method == 'POST':
-        password = request.form.get("password")
+        password = request.form.get(Password)
         if not login(password):
-            text.append('<p> Access denied! </p>')
+            text.append(no_access)
         else:
-            input = request.form.get("changes")
+            input = request.form.get(change)
             splitted = input.split(', ')
             orders = read_json("offers.json")
             if splitted[0] in orders:
                 order = orders[splitted[0]]
-                order["process"] = splitted[1]
+                order[name_process] = splitted[1]
                 orders[splitted[0]].update(order)
                 write_json("offers.json", orders)
-                text.append('<p>  Changed! </p>')
+                text.append(changed)
             else:
-                text.append('<p>  Not found! </p>')
+                text.append(not_found)
     text.append(go_back)
     return " ".join(tuple(text))
 
 
-@app.route('/change_password/', methods=['POST', 'GET'])
+@app.route(change_password_page, methods=['POST', 'GET'])
 def change_password():
     text = list()
-    text.append(unique_form(True, "Old password", "change", "password", "New password", "password2"))
+    text.append(unique_form(True, old_pass, change, Password, new_password, new_password))
     if request.method == 'POST':
-        password = request.form.get("password")
+        password = request.form.get(Password)
         if not login(password):
-            text.append('<p> Access denied! </p>')
+            text.append(no_access)
         else:
-            password2 = request.form.get("password2")
+            password2 = request.form.get(new_password)
             with open("password.txt", "w") as writing_lines:
                 writing_lines.write(password2)
-            text.append('<p> Changed! </p>')
+            text.append(changed)
     text.append(go_back)
     return " ".join(tuple(text))
 
