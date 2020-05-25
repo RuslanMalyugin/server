@@ -2,6 +2,7 @@ import json
 from flask import Flask, request
 from config import *
 
+
 app = Flask("Shesterochka")
 
 
